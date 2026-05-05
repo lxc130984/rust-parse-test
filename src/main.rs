@@ -3,6 +3,27 @@ use rust_parse_test::{parser,eval,value_handle,parse_error_handle};
 use rustyline::{DefaultEditor, error::ReadlineError};
 
 fn main(){
+    let nth = std::env::args().nth(1);
+    match nth{
+	Some(str)=>{
+	    readfile_eval(str)
+	},
+	None=>{readline_eval()}
+    }
+    
+}
+
+fn readfile_eval(str:String){
+    match std::fs::read_to_string(str){
+	Ok(str)=>{output(&str)},
+	Err(e)=>{println!("{:?}",e)}
+    }
+    
+    
+    
+}
+
+fn readline_eval(){
     let mut rl = DefaultEditor::new().unwrap();
     loop{
 	let readline = rl.readline(">> ");
@@ -16,8 +37,6 @@ fn main(){
 	}
     }
 }
-
-
 
 fn output(str:&str){
     match parser().parse(str).into_result(){
