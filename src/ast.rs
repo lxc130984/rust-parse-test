@@ -103,14 +103,13 @@ fn logic_parser<'src>(
 }
 
 fn let_parser<'src>(
-    logic:impl Parser<'src,&'src str,Expr<'src>,extra::Err<Rich<'src,char>>>+Clone+'src,
     expr:impl Parser<'src,&'src str,Expr<'src>,extra::Err<Rich<'src,char>>>+Clone+'src
 )->impl Parser<'src,&'src str,Expr<'src>,extra::Err<Rich<'src,char>>>+Clone{
     let let_parser=text::ascii::keyword("let")
         .padded()
         .ignore_then(text::ascii::ident().padded())
         .then_ignore(just('=').padded())
-        .then(logic)
+        .then(expr.clone())
         .then_ignore(just(';').padded())
         .then(expr)
         .map(|((name,value),body)|{
@@ -156,11 +155,11 @@ pub fn parser<'src>()->impl Parser<'src,&'src str,Expr<'src>,extra::Err<Rich<'sr
 	let comparsion = comparsion_parse(sum);
 
 	let logic = logic_parser(comparsion);
-	let let_ = let_parser(logic.clone(),expr.clone());
+	let let_ = let_parser(expr.clone());
 	let block = block_parser(expr.clone());
 	let if_else = if_parser(expr);
 
-	let_.or(if_else).or(logic).or(block).boxed()
+	let_.or(if_else).or(logic).or(block).boxed() //含有关键字的要在logic前面
     })
 }
 
