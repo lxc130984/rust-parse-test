@@ -1,4 +1,5 @@
-#[derive(Debug)]
+
+#[derive(Debug,Clone)]
 pub enum Value{
     Unit,
     Num(f64),
@@ -92,6 +93,8 @@ impl Value{
 }
 
 
+
+
 #[derive(Debug,Clone)]
 pub enum Expr<'src>{
     Num(f64),
@@ -116,68 +119,123 @@ pub enum Expr<'src>{
     Or(Box<Expr<'src>>,Box<Expr<'src>>),
     
     Block(Vec<Expr<'src>>),
+    Let(String,Box<Expr<'src>>,Box<Expr<'src>>),
+    Var(String),
+
+    If(Box<Expr<'src>>,Box<Expr<'src>>,Option<Box<Expr<'src>>>),
     
 }
 
 pub fn eval<'src>(
     expr:&'src Expr<'src>,
+    env:&mut Env,
 )->Result<Value,String>{
     match expr {
 	Expr::Num(f)=>{Ok(Value::Num(*f))},
 	Expr::Neg(e)=>{
-	    Value::value_neg(eval(e)?)
+	    Value::value_neg(eval(e,env)?)
 	},
 	Expr::Add(a,b)=>{
-	    Value::value_add(eval(a)?,eval(b)?)
+	    Value::value_add(eval(a,env)?,eval(b,env)?)
 	},
 	Expr::Sub(a,b)=>{
-	    Value::value_sub(eval(a)?,eval(b)?)
+	    Value::value_sub(eval(a,env)?,eval(b,env)?)
 	},
 	Expr::Mul(a,b)=>{
-	    Value::value_mul(eval(a)?,eval(b)?)
+	    Value::value_mul(eval(a,env)?,eval(b,env)?)
 	},
 	Expr::Div(a,b)=>{
-	    Value::value_div(eval(a)?,eval(b)?)
+	    Value::value_div(eval(a,env)?,eval(b,env)?)
 	},
 	Expr::Bool(b)=>{
 	    Ok(Value::Bool(*b))
 	},
 	Expr::Eq(a,b)=>{
-	    Value::value_eq(eval(a)?,eval(b)?)
+	    Value::value_eq(eval(a,env)?,eval(b,env)?)
 	},
 	Expr::Neq(a,b)=>{
-	    Value::value_neq(eval(a)?,eval(b)?)
+	    Value::value_neq(eval(a,env)?,eval(b,env)?)
 	},
 	Expr::Gt(a,b)=>{
-	    Value::value_gt(eval(a)?,eval(b)?)
+	    Value::value_gt(eval(a,env)?,eval(b,env)?)
 	},
 	Expr::Lt(a,b)=>{
-	    Value::value_lt(eval(a)?,eval(b)?)
+	    Value::value_lt(eval(a,env)?,eval(b,env)?)
 	},
 	Expr::Ge(a,b)=>{
-	    Value::value_ge(eval(a)?,eval(b)?)
+	    Value::value_ge(eval(a,env)?,eval(b,env)?)
 	},
 	Expr::Le(a,b)=>{
-	    Value::value_le(eval(a)?,eval(b)?)
+	    Value::value_le(eval(a,env)?,eval(b,env)?)
 	},
 	Expr::And(a,b)=>{
-	    Value::value_and(eval(a)?,eval(b)?)
+	    Value::value_and(eval(a,env)?,eval(b,env)?)
 	},
 	Expr::Or(a,b)=>{
-	    Value::value_or(eval(a)?,eval(b)?)
-	}
+	    Value::value_or(eval(a,env)?,eval(b,env)?)
+	},
+	Expr::Var(name)=>{
+	    match env.get(&name){
+		Some(v)=>{Ok(v)},
+		None=>{Err("eval error when var,can not find the var".to_string())}
+	    }
+	},
 	Expr::Block(vec)=>{
 	    let mut last = Value::Unit;
 	    for e in vec{
-		last = eval(e)?;
+		last = eval(e,env)?;
 	    }
 	    Ok(last)
 	},
-	
-	
-	
+	Expr::Let(name,value,body)=>{
+	    let val = eval(value,env)?;
+	    env.push(&name,val);
+	    let result = eval(body,env);
+	    env.pop();
+	    result
+	},
+	Expr::If(cond,then_expr,else_expr)=>{
+	    let cond_value = eval(cond,env)?;
+	    match cond_value {
+		Value::Bool(true)=>{eval(then_expr,env)},
+		Value::Bool(false)=>{
+		    match else_expr{
+			Some(e)=>{eval(e,env)},
+			None=>{Ok(Value::Unit)},
+		    }
+		},
+		_=>{Err("error eval if-else".to_string())},
+	    }
+	}
 	_=>{todo!()}
     }
+}
+
+pub struct Env{
+    bindings:Vec<(String,Value)>,
+}
+
+impl Env{
+    pub fn new()->Self{
+	Self{
+	    bindings:Vec::new(),
+	}
+    }
+
+    fn get(&self,name:&str)->Option<Value>{
+	self.bindings.iter().rev()
+	    .find(|(str,_)|{str==name})
+	    .map(|(_,value)|{value.clone()})
+    }
+
+    fn push(&mut self,name:&str,value:Value){
+	self.bindings.push((name.to_string(),value));
+    }
+    
+    fn pop(&mut self){
+	self.bindings.pop();
+    }
+
 }
 
 pub fn value_handle(v:Value){

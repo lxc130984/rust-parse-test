@@ -1,5 +1,5 @@
 use chumsky::{ prelude::*};
-use rust_parse_test::{parser,eval,value_handle,parse_error_handle};
+use rust_parse_test::{Env, eval, parse_error_handle, parser, value_handle};
 use rustyline::{DefaultEditor, error::ReadlineError};
 
 fn main(){
@@ -14,8 +14,12 @@ fn main(){
 }
 
 fn readfile_eval(str:String){
+    
     match std::fs::read_to_string(str){
-	Ok(str)=>{output(&str)},
+	Ok(str)=>{
+	let mut env = Env::new();
+    output(&str,&mut env)
+	},
 	Err(e)=>{println!("{:?}",e)}
     }
     
@@ -25,12 +29,13 @@ fn readfile_eval(str:String){
 
 fn readline_eval(){
     let mut rl = DefaultEditor::new().unwrap();
+    let mut env = Env::new();
     loop{
 	let readline = rl.readline(">> ");
 	match readline{
 	    Ok(line)=>{
 		rl.add_history_entry(&line).unwrap();
-		output(&line)
+		output(&line,&mut env)
 	    },
 	    Err(ReadlineError::Eof)|Err(ReadlineError::Interrupted)=>{break},
 	    Err(e)=>{println!("{:?}",e);break}
@@ -38,11 +43,12 @@ fn readline_eval(){
     }
 }
 
-fn output(str:&str){
+fn output(str:&str,env:&mut Env){
+ 
     match parser().parse(str).into_result(){
 	Ok(expr)=>{
 	    println!("{:#?}",expr);
-	    let eval_result=eval(&expr);
+	    let eval_result=eval(&expr,env);
 	    match eval_result{
 		Ok(v)=>{value_handle(v)}
 		Err(str)=>{println!("{}",str);}
