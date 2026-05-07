@@ -96,38 +96,58 @@ impl Value{
 
 
 #[derive(Debug,Clone)]
-pub enum Expr<'src>{
+pub enum Expr{
     Num(f64),
     Bool(bool),
-    String(&'src str),
+    String(String),
     Unit,
     
-    Neg(Box<Expr<'src>>),
-    Sub(Box<Expr<'src>>,Box<Expr<'src>>),
-    Add(Box<Expr<'src>>,Box<Expr<'src>>),
-    Mul(Box<Expr<'src>>,Box<Expr<'src>>),
-    Div(Box<Expr<'src>>,Box<Expr<'src>>),
+    Neg(Box<Expr>),
+    Sub(Box<Expr>,Box<Expr>),
+    Add(Box<Expr>,Box<Expr>),
+    Mul(Box<Expr>,Box<Expr>),
+    Div(Box<Expr>,Box<Expr>),
 
-    Eq(Box<Expr<'src>>,Box<Expr<'src>>),
-    Neq(Box<Expr<'src>>,Box<Expr<'src>>),
-    Gt(Box<Expr<'src>>,Box<Expr<'src>>), //>
-    Lt(Box<Expr<'src>>,Box<Expr<'src>>), //<
-    Ge(Box<Expr<'src>>,Box<Expr<'src>>), //>=
-    Le(Box<Expr<'src>>,Box<Expr<'src>>), //<=
+    Eq(Box<Expr>,Box<Expr>),
+    Neq(Box<Expr>,Box<Expr>),
+    Gt(Box<Expr>,Box<Expr>), //>
+    Lt(Box<Expr>,Box<Expr>), //<
+    Ge(Box<Expr>,Box<Expr>), //>=
+    Le(Box<Expr>,Box<Expr>), //<=
 
-    And(Box<Expr<'src>>,Box<Expr<'src>>),
-    Or(Box<Expr<'src>>,Box<Expr<'src>>),
+    And(Box<Expr>,Box<Expr>),
+    Or(Box<Expr>,Box<Expr>),
     
-    Block(Vec<Expr<'src>>),
-    Let(String,Box<Expr<'src>>,Box<Expr<'src>>),
+    Block(Vec<Expr>),
     Var(String),
-
-    If(Box<Expr<'src>>,Box<Expr<'src>>,Option<Box<Expr<'src>>>),
     
+    Let{
+	name:String,
+	value:Box<Expr>,
+	then:Box<Expr>,
+    },
+
+    If{
+	cond:Box<Expr>,
+	then_expr:Box<Expr>,
+	else_expr:Option<Box<Expr>>,
+    },
+
+    Fn{
+	name:String,
+	args:Vec<String>,
+	body:Box<Expr>,
+	then:Box<Expr>,
+    },
+
+    Call{
+	name:String,
+	args:Vec<Expr>
+    }
 }
 
-pub fn eval<'src>(
-    expr:&'src Expr<'src>,
+pub fn eval(
+    expr:&Expr,
     env:&mut Env,
 )->Result<Value,String>{
     match expr {
@@ -175,7 +195,7 @@ pub fn eval<'src>(
 	    Value::value_or(eval(a,env)?,eval(b,env)?)
 	},
 	Expr::Var(name)=>{
-	    match env.get(&name){
+	    match env.get_var(&name){
 		Some(v)=>{Ok(v)},
 		None=>{Err("eval error when var,can not find the var".to_string())}
 	    }
@@ -187,14 +207,14 @@ pub fn eval<'src>(
 	    }
 	    Ok(last)
 	},
-	Expr::Let(name,value,body)=>{
+	Expr::Let { name, value, then }=>{
 	    let val = eval(value,env)?;
-	    env.push(&name,val);
-	    let result = eval(body,env);
-	    env.pop();
+	    env.push_var(name,val);
+	    let result = eval(then,env);
+	    env.pop_var();
 	    result
 	},
-	Expr::If(cond,then_expr,else_expr)=>{
+	Expr::If { cond, then_expr, else_expr }=>{
 	    let cond_value = eval(cond,env)?;
 	    match cond_value {
 		Value::Bool(true)=>{eval(then_expr,env)},
@@ -206,34 +226,88 @@ pub fn eval<'src>(
 		},
 		_=>{Err("error eval if-else".to_string())},
 	    }
-	}
+	},
+	Expr::Fn{name,args,body,then}=>{
+	    let fuc_def = FucDef{args:args.clone(),body:body.clone()};
+	    env.push_func(name,fuc_def);
+	    let result = eval(then,env);
+	    env.pop_func();
+	    result
+	},
+	Expr::Call{name,args}=>{
+	    let func_find = env
+		.get_func(name)
+		.ok_or_else(||format!("error eval call {}",name))?
+		.clone();
+	    if func_find.args.len() != args.len(){
+		return Err(format!("error eval call {},error args",name));
+	    }
+	    let mut arg_values = Vec::new();
+	    for arg in args{
+		arg_values.push(eval(arg,env)?);
+	    }
+
+	    let old_len = env.bindings.len();
+	    for (param_name,arg_val) in func_find.args.iter().zip(arg_values){
+		env.push_var(param_name,arg_val);
+	    }
+
+	    let result = eval(&func_find.body,env);
+	    env.bindings.truncate(old_len);
+	    
+	    result
+	},
+	
 	_=>{todo!()}
     }
 }
 
+#[derive(Clone)]
+struct FucDef{
+    args:Vec<String>,
+    body:Box<Expr>,
+}
+
+#[derive(Clone)]
 pub struct Env{
     bindings:Vec<(String,Value)>,
+    fuctions:Vec<(String,FucDef)>,
 }
 
 impl Env{
     pub fn new()->Self{
 	Self{
 	    bindings:Vec::new(),
+	    fuctions:Vec::new(),
 	}
     }
 
-    fn get(&self,name:&str)->Option<Value>{
+    fn get_var(&self,name:&str)->Option<Value>{
 	self.bindings.iter().rev()
 	    .find(|(str,_)|{str==name})
 	    .map(|(_,value)|{value.clone()})
     }
 
-    fn push(&mut self,name:&str,value:Value){
+    fn push_var(&mut self,name:&str,value:Value){
 	self.bindings.push((name.to_string(),value));
     }
     
-    fn pop(&mut self){
+    fn pop_var(&mut self){
 	self.bindings.pop();
+    }
+
+    fn get_func(&self,name:&str)->Option<&FucDef>{
+	self.fuctions.iter().rev()
+	    .find(|(str,_)|{str==name})
+	    .map(|(_,fuc_def)|{fuc_def})
+    }
+
+    fn push_func(&mut self,name:&str,fuc_def:FucDef){
+	self.fuctions.push((name.to_string(),fuc_def));
+    }
+
+    fn pop_func(&mut self){
+	self.fuctions.pop();
     }
 
 }
