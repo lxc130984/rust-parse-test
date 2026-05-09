@@ -1,7 +1,8 @@
-use chumsky::{error::RichReason, prelude::*, util::Maybe};
+use chumsky::{error::RichReason, input::MapExtra, prelude::*, util::Maybe};
 use ariadne::{ColorGenerator,Source,Label,Report};
 use crate::eval::Expr;
 
+type StrMapExtra<'a,'b> = MapExtra<'a, 'b, &'a str, extra::Full<Rich<'a, char>, (), ()>>;
 
 fn atom_parse<'src>(
     expr:impl Parser<'src, &'src str ,Expr,extra::Err<Rich<'src,char>>> + 'src + Clone
@@ -12,14 +13,14 @@ fn atom_parse<'src>(
 
     let unary = just('-').padded()
         .repeated()
-        .foldr(int,|_,r|{Expr::Neg(Box::new(r))});
+        .foldr_with(int,|_,r,e:&mut StrMapExtra |{Expr::Neg(Box::new(r),e.span().into_range())});
 
     
     let bool = just("false").padded().to(Expr::Bool(false))
         .or(just("true").padded().to(Expr::Bool(true)));
 
     let var = text::ascii::ident().padded()
-        .map(|s:&str|{Expr::Var(s.to_string())});//这里没有筛选关键字
+        .map_with(|s:&str,e: &mut StrMapExtra|{Expr::Var(s.to_string(),e.span().into_range())});//这里没有筛选关键字
     
 
     let block = block_parser(expr.clone());
@@ -32,15 +33,15 @@ fn atom_parse<'src>(
 fn product_parse<'src>(
     atom:impl Parser<'src,&'src str,Expr,extra::Err<Rich<'src,char>>>+'src+Clone
 )->impl Parser<'src, &'src str ,Expr,extra::Err<Rich<'src,char>>>+Clone{
-    let product = atom.clone().foldl(
+    let product = atom.clone().foldl_with(
 	choice((
-	    just('*').padded().to(Expr::Mul as fn(_,_)->_),
-	    just('/').padded().to(Expr::Div as fn(_,_)->_)
+	    just('*').padded().to(Expr::Mul as fn(_,_,_)->_),
+	    just('/').padded().to(Expr::Div as fn(_,_,_)->_)
 	))
 	    .then(atom)
 	    .repeated()
 	    ,
-	|l,(m_or_d,r)|{m_or_d(Box::new(l),Box::new(r))}
+	|l,(m_or_d,r),e:&mut StrMapExtra|{m_or_d(Box::new(l),Box::new(r),e.span().into_range())}
     ).boxed();
     product
 }
@@ -49,15 +50,15 @@ fn sum_parse<'src>(
     product:impl Parser<'src,&'src str,Expr,extra::Err<Rich<'src,char>>>+'src+Clone
 )->impl Parser<'src, &'src str ,Expr,extra::Err<Rich<'src,char>>>+Clone{
     let sum = product.clone()
-	.foldl(
+	.foldl_with(
 	    choice((
-		just('+').padded().to(Expr::Add as fn(_,_)->_),
-		just('-').padded().to(Expr::Sub as fn(_,_)->_)
+		just('+').padded().to(Expr::Add as fn(_,_,_)->_),
+		just('-').padded().to(Expr::Sub as fn(_,_,_)->_)
 	    ))
 		.then(product)
 		.repeated()
 		,
-	    |l,(a_or_s,r)|{a_or_s(Box::new(l),Box::new(r))}
+	    |l,(a_or_s,r),e|{a_or_s(Box::new(l),Box::new(r),e.span().into_range())}
 	).boxed();
     sum
 }
@@ -67,19 +68,19 @@ fn comparsion_parse<'src>(
 )->impl Parser<'src, &'src str ,Expr,extra::Err<Rich<'src,char>>>+Clone{
     sum.clone()
         .then(choice((
-	    just("==").padded().to(Expr::Eq as fn(_, _) -> _),
-	    just("!=").padded().to(Expr::Neq as fn(_, _) -> _),
-	    just(">=").padded().to(Expr::Ge as fn(_, _) -> _),
-	    just("<=").padded().to(Expr::Le as fn(_, _) -> _),
-	    just(">").padded().to(Expr::Gt as fn(_, _) -> _),
-	    just("<").padded().to(Expr::Lt as fn(_, _) -> _),
+	    just("==").padded().to(Expr::Eq as fn(_,_, _) -> _),
+	    just("!=").padded().to(Expr::Neq as fn(_,_, _) -> _),
+	    just(">=").padded().to(Expr::Ge as fn(_,_, _) -> _),
+	    just("<=").padded().to(Expr::Le as fn(_,_, _) -> _),
+	    just(">").padded().to(Expr::Gt as fn(_,_, _) -> _),
+	    just("<").padded().to(Expr::Lt as fn(_,_, _) -> _),
 	))
 	      .then(sum)
 	      .or_not()
 	)
-        .map(|(l,o_r)|{
+        .map_with(|(l,o_r),e:&mut StrMapExtra|{
 	    match o_r{
-		Some((op,r))=>{op(Box::new(l),Box::new(r))},
+		Some((op,r))=>{op(Box::new(l),Box::new(r),e.span().into_range())},
 		None=>{l},
 	    }
 	}).boxed()
@@ -90,15 +91,15 @@ fn logic_parser<'src>(
 )->impl Parser<'src,&'src str,Expr,extra::Err<Rich<'src,char>>>+Clone{
     
     comparsion.clone()
-	.foldl(
+	.foldl_with(
 	    choice((
-		just("&&").padded().to(Expr::And as fn(_,_)->_),
-		just("||").padded().to(Expr::Or as fn(_,_)->_),
+		just("&&").padded().to(Expr::And as fn(_,_,_)->_),
+		just("||").padded().to(Expr::Or as fn(_,_,_)->_),
 	    ))
 		.then(comparsion)
 		.repeated()
 		,
-	    |l,(op,r)|{op(Box::new(l),Box::new(r))}
+	    |l,(op,r),e:&mut StrMapExtra|{op(Box::new(l),Box::new(r),e.span().into_range())}
 	)
 }
 
@@ -112,11 +113,12 @@ fn let_parser<'src>(
         .then(expr.clone())
         .then_ignore(just(';').padded())
         .then(expr)
-        .map(|((name,value),body)|{
+        .map_with(|((name,value),body),e|{
 	    Expr::Let{
 		name:name.to_string(),
 		value:Box::new(value),
-		then:Box::new(body)
+		then:Box::new(body),
+		range:e.span().into_range()
 	    }
 	}).boxed();
     let_parser
@@ -134,10 +136,11 @@ fn if_parser<'src>(
 		.ignore_then(block_parser(expr))
 		.or_not()
 	)
-        .map(|((cond,then),else_or)|{Expr::If{
+        .map_with(|((cond,then),else_or),e|{Expr::If{
 	    cond:Box::new(cond),
 	    then_expr:Box::new(then),
-	    else_expr:else_or.map(Box::new)
+	    else_expr:else_or.map(Box::new),
+	    range:e.span().into_range()
 	}})
         .boxed()
 }
@@ -149,7 +152,7 @@ fn block_parser<'src>(
     expr.separated_by(just(';').padded())
 	.collect::<Vec<_>>()
 	.delimited_by(just('{').padded(),just('}').padded()).padded()
-	.map(Expr::Block)
+	.map_with(|v,e|{Expr::Block(v,e.span().into_range())})
 	.boxed()
 }
 
@@ -168,10 +171,12 @@ fn func_parser<'src>(
 	)
         .then(block_parser(expr.clone()))
         .then(expr)
-        .map(|(((name,args),body),then)|{
+        .map_with(|(((name,args),body),then),e|{
 	    Expr::Fn{name:name.to_string(),
 		     args:args.iter().map(|s|{s.to_string()}).collect(),
-		     body:Box::new(body),then:Box::new(then)}
+		     body:Box::new(body),then:Box::new(then),
+		     range:e.span().into_range()
+	    }
 	})
         .boxed()
 }
@@ -186,7 +191,7 @@ fn call_parser<'src>(
               .collect::<Vec<_>>()
               .delimited_by(just('(').padded(),just(')').padded())
 	)
-        .map(|(name,args)|{Expr::Call{name:name.to_string(),args:args}})
+        .map_with(|(name,args),e|{Expr::Call{name:name.to_string(),args:args,range:e.span().into_range()}})
         .boxed()
 	
 	

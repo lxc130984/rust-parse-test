@@ -1,5 +1,5 @@
 use chumsky::{ prelude::*};
-use rust_parse_test::{Env, eval, parse_error_handle, parser, value_handle};
+use rust_parse_test::{Env, eval, eval_error_handle, parse_error_handle, parser, value_handle};
 use rustyline::{DefaultEditor, error::ReadlineError};
 
 fn main(){
@@ -51,7 +51,9 @@ fn output(str:&str,env:&mut Env){
 	    let eval_result=eval(&expr,env);
 	    match eval_result{
 		Ok(v)=>{value_handle(v)}
-		Err(str)=>{println!("{}",str);}
+		Err(e)=>{
+		    eval_error_handle(e,str)
+		}
 	    }
 	},
 	Err(e)=>{parse_error_handle(e,str)},
