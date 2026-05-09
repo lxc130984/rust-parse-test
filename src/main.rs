@@ -47,7 +47,7 @@ fn output(str:&str,env:&mut Env){
  
     match parser().parse(str).into_result(){
 	Ok(expr)=>{
-	    println!("{:#?}",expr);
+	    //println!("{:#?}",expr);
 	    let eval_result=eval(&expr,env);
 	    match eval_result{
 		Ok(v)=>{value_handle(v)}

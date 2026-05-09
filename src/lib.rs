@@ -1,4 +1,4 @@
-mod ast;
+pub mod ast;
 pub use ast::*;
-mod eval;
+pub mod eval;
 pub use eval::*;

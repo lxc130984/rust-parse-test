@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 
 #[derive(Debug,Clone)]
 pub enum Value{
@@ -196,7 +198,7 @@ pub fn eval(
 	},
 	Expr::Var(name)=>{
 	    match env.get_var(&name){
-		Some(v)=>{Ok(v)},
+		Some(v)=>{Ok(v.clone())},
 		None=>{Err("eval error when var,can not find the var".to_string())}
 	    }
 	},
@@ -207,6 +209,14 @@ pub fn eval(
 	    }
 	    Ok(last)
 	},
+	
+
+
+
+	//改成函数方便测试
+
+
+	
 	Expr::Let { name, value, then }=>{
 	    let val = eval(value,env)?;
 	    env.push_var(name,val);
@@ -237,8 +247,7 @@ pub fn eval(
 	Expr::Call{name,args}=>{
 	    let func_find = env
 		.get_func(name)
-		.ok_or_else(||format!("error eval call {}",name))?
-		.clone();
+		.ok_or_else(||format!("error eval call {}",name))?;
 	    if func_find.args.len() != args.len(){
 		return Err(format!("error eval call {},error args",name));
 	    }
@@ -271,7 +280,7 @@ struct FucDef{
 #[derive(Clone)]
 pub struct Env{
     bindings:Vec<(String,Value)>,
-    fuctions:Vec<(String,FucDef)>,
+    fuctions:Vec<(String,Rc<FucDef>)>,
 }
 
 impl Env{
@@ -282,10 +291,10 @@ impl Env{
 	}
     }
 
-    fn get_var(&self,name:&str)->Option<Value>{
+    fn get_var(&self,name:&str)->Option<&Value>{
 	self.bindings.iter().rev()
 	    .find(|(str,_)|{str==name})
-	    .map(|(_,value)|{value.clone()})
+	    .map(|(_,value)|{value})
     }
 
     fn push_var(&mut self,name:&str,value:Value){
@@ -296,14 +305,14 @@ impl Env{
 	self.bindings.pop();
     }
 
-    fn get_func(&self,name:&str)->Option<&FucDef>{
+    fn get_func(&self,name:&str)->Option<Rc<FucDef>>{
 	self.fuctions.iter().rev()
 	    .find(|(str,_)|{str==name})
-	    .map(|(_,fuc_def)|{fuc_def})
+	    .map(|(_,fuc_def)|{fuc_def.clone()})
     }
 
     fn push_func(&mut self,name:&str,fuc_def:FucDef){
-	self.fuctions.push((name.to_string(),fuc_def));
+	self.fuctions.push((name.to_string(),Rc::new(fuc_def)));
     }
 
     fn pop_func(&mut self){
