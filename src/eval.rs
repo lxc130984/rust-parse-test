@@ -233,50 +233,7 @@ pub fn eval(
     env:&mut Env,
 )->Result<Value,EvalError>{
     match expr {
-	Expr::Num(f)=>{Ok(Value::Num(*f))},
-	Expr::Neg(e,r)=>{
-	    Value::value_neg(eval(e,env)?,r.clone())
-	},
-	Expr::Add(a,b,r)=>{
-	    Value::value_add(eval(a,env)?,eval(b,env)?,r.clone())
-	},
-	Expr::Sub(a,b,r)=>{
-	    Value::value_sub(eval(a,env)?,eval(b,env)?,r.clone())
-	},
-	Expr::Mul(a,b,r)=>{
-	    Value::value_mul(eval(a,env)?,eval(b,env)?,r.clone())
-	},
-	Expr::Div(a,b,r)=>{
-	    Value::value_div(eval(a,env)?,eval(b,env)?,r.clone())
-	},
-	Expr::Bool(b)=>{
-	    Ok(Value::Bool(*b))
-	},
-	Expr::Eq(a,b,r)=>{
-	    Value::value_eq(eval(a,env)?,eval(b,env)?,r.clone())
-	},
-	Expr::Neq(a,b,r)=>{
-	    Value::value_neq(eval(a,env)?,eval(b,env)?,r.clone())
-	},
-	Expr::Gt(a,b,r)=>{
-	    Value::value_gt(eval(a,env)?,eval(b,env)?,r.clone())
-	},
-	Expr::Lt(a,b,r)=>{
-	    Value::value_lt(eval(a,env)?,eval(b,env)?,r.clone())
-	},
-	Expr::Ge(a,b,r)=>{
-	    Value::value_ge(eval(a,env)?,eval(b,env)?,r.clone())
-	},
-	Expr::Le(a,b,r)=>{
-	    Value::value_le(eval(a,env)?,eval(b,env)?,r.clone())
-	},
-	Expr::And(a,b,r)=>{
-	    Value::value_and(eval(a,env)?,eval(b,env)?,r.clone())
-	},
-	Expr::Or(a,b,r)=>{
-	    Value::value_or(eval(a,env)?,eval(b,env)?,r.clone())
-	},
-	Expr::Var(name,r)=>{
+		Expr::Var(name,r)=>{
 	    match env.get_var(&name){
 		Some(v)=>{Ok(v.clone())},
 		None=>{
@@ -363,6 +320,50 @@ pub fn eval(
 	    env.bindings.truncate(old_len);
 	    
 	    result
+	},
+
+	Expr::Num(f)=>{Ok(Value::Num(*f))},
+	Expr::Neg(e,r)=>{
+	    Value::value_neg(eval(e,env)?,r.clone())
+	},
+	Expr::Add(a,b,r)=>{
+	    Value::value_add(eval(a,env)?,eval(b,env)?,r.clone())
+	},
+	Expr::Sub(a,b,r)=>{
+	    Value::value_sub(eval(a,env)?,eval(b,env)?,r.clone())
+	},
+	Expr::Mul(a,b,r)=>{
+	    Value::value_mul(eval(a,env)?,eval(b,env)?,r.clone())
+	},
+	Expr::Div(a,b,r)=>{
+	    Value::value_div(eval(a,env)?,eval(b,env)?,r.clone())
+	},
+	Expr::Bool(b)=>{
+	    Ok(Value::Bool(*b))
+	},
+	Expr::Eq(a,b,r)=>{
+	    Value::value_eq(eval(a,env)?,eval(b,env)?,r.clone())
+	},
+	Expr::Neq(a,b,r)=>{
+	    Value::value_neq(eval(a,env)?,eval(b,env)?,r.clone())
+	},
+	Expr::Gt(a,b,r)=>{
+	    Value::value_gt(eval(a,env)?,eval(b,env)?,r.clone())
+	},
+	Expr::Lt(a,b,r)=>{
+	    Value::value_lt(eval(a,env)?,eval(b,env)?,r.clone())
+	},
+	Expr::Ge(a,b,r)=>{
+	    Value::value_ge(eval(a,env)?,eval(b,env)?,r.clone())
+	},
+	Expr::Le(a,b,r)=>{
+	    Value::value_le(eval(a,env)?,eval(b,env)?,r.clone())
+	},
+	Expr::And(a,b,r)=>{
+	    Value::value_and(eval(a,env)?,eval(b,env)?,r.clone())
+	},
+	Expr::Or(a,b,r)=>{
+	    Value::value_or(eval(a,env)?,eval(b,env)?,r.clone())
 	},
 	
 	_=>{todo!()}

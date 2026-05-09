@@ -37,13 +37,13 @@ eval error: error_kind : Add
 
 ## Project Structure
 
-| File | Purpose |
-|------|---------|
-| `src/main.rs` | Entry point, REPL, file loader |
-| `src/lib.rs` | Module re-exports |
-| `src/ast.rs` | Parser (chumsky combinators) and parse error reporting |
+| File          | Purpose                                                                      |
+|---------------|------------------------------------------------------------------------------|
+| `src/main.rs` | Entry point, REPL, file loader                                               |
+| `src/lib.rs`  | Module re-exports                                                            |
+| `src/ast.rs`  | Parser (chumsky combinators) and parse error reporting                       |
 | `src/eval.rs` | AST types (`Expr`, `Value`), evaluator, environment, runtime error reporting |
-| `src/test` | Example factorial program |
+| `src/test`    | Example factorial program                                                    |
 
 ## Dependencies
 
