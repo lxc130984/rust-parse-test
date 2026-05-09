@@ -5,4 +5,4 @@ fn factorial(n) {
         factorial(n- 2) + factorial(n - 1)
     }
 }
-factorial(29)
+factorial(36)
